@@ -1,0 +1,60 @@
+# Pushing a tag v* builds both programs for every platform datalib ships
+# for, packs one archive per platform with tools/pack_datalib_package.py,
+# and publishes them with the manifest as that tag's GitHub release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-14 }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-22.04, musl: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-22.04-arm, musl: true }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      # A tar keeps the executable bits, which upload-artifact drops.
+      - run: |
+          mkdir -p dist/bin
+          cp target/${{ matrix.target }}/release/hello-ingest target/${{ matrix.target }}/release/hello-greetings dist/bin/
+          tar -C dist -cf ${{ matrix.target }}.tar bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.target }}
+          path: ${{ matrix.target }}.tar
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-*
+          merge-multiple: true
+          path: tars
+      - run: |
+          for t in tars/*.tar; do
+            target=$(basename "$t" .tar)
+            mkdir -p "build/$target"
+            tar -C "build/$target" -xf "$t"
+          done
+          python3 tools/pack_datalib_package.py . out
+      - run: gh release create "$GITHUB_REF_NAME" out/* --title "Hello ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

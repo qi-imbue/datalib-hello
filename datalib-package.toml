@@ -1,8 +1,8 @@
 # A datalib package: see https://github.com/imbue-ai/datalib/blob/main/docs/dev/packages.md
 schema = 1
 name = "Hello"
-version = "0.1.0"
-description = "Writes a greeting and its settings into the library."
+version = "0.2.0"
+description = "Writes a greeting and its settings into the library, and adds a card that shows them."
 homepage = "https://github.com/qi-imbue/datalib-hello"
 step_protocol = 1
 
@@ -17,3 +17,7 @@ nameHint = "Hello test"
 defaultName = "hello"
 sections = [{ heading = "What to say", fields = ["greeting"] }]
 fields = [{ kind = "text", target = "greeting", label = "Greeting", required = true }]
+
+[[applets]]
+id = "hello_greetings"
+command = "bin/hello-greetings"
