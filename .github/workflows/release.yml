@@ -38,7 +38,8 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-22.04
+    # The pack script reads TOML with tomllib, Python 3.11 or newer.
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
