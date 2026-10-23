@@ -1,9 +1,9 @@
-// The Hello package's card: what each Hello source in the library last
-// wrote, from the applet's /greetings endpoint.
+// The Hello package's card: what one Hello source has written, newest
+// first, from its applet's /greetings endpoint.
 
 export default function greetings(appletId) {
   if (typeof appletId !== "string" || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(appletId)) {
-    throw new Error('greetings takes the applet\'s id, as in greetings("hello_greetings")');
+    throw new Error('greetings takes the applet\'s id, as in greetings("my_hello_greetings")');
   }
   const url = `/applet/${appletId}/greetings`;
 
@@ -29,17 +29,18 @@ export default function greetings(appletId) {
       return e;
     }
 
-    function show(rows) {
+    function show({ source, greetings }) {
+      ctx.setTitle(`Greetings · ${source}`);
       wrap.replaceChildren();
-      if (!rows.length) {
-        wrap.appendChild(el("div", "hg-note", "No Hello source has run yet. Add one, then sync it."));
+      if (!greetings.length) {
+        wrap.appendChild(el("div", "hg-note", `${source} has not run yet. Sync it.`));
         return;
       }
-      for (const r of rows) {
+      for (const g of greetings) {
         const row = el("div", "hg-row", "");
-        row.appendChild(el("div", "hg-text", r.greeting || "(no greeting)"));
-        const when = r.written_ms ? new Date(r.written_ms).toLocaleString() : "";
-        row.appendChild(el("div", "hg-meta", when ? `${r.source} · ${when}` : r.source));
+        row.appendChild(el("div", "hg-text", g.greeting || "(no greeting)"));
+        const when = g.at ? new Date(g.at).toLocaleString() : "";
+        row.appendChild(el("div", "hg-meta", when));
         wrap.appendChild(row);
       }
     }
@@ -48,7 +49,7 @@ export default function greetings(appletId) {
     wrap.appendChild(el("div", "hg-note", "Loading…"));
     fetch(url)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${url}: HTTP ${r.status}`))))
-      .then((rows) => !cancelled && show(rows))
+      .then((body) => !cancelled && show(body))
       .catch((e) => {
         if (cancelled) return;
         wrap.replaceChildren(el("div", "hg-note", String(e.message || e)));

@@ -1,23 +1,23 @@
 # A datalib package: see https://github.com/imbue-ai/datalib/blob/main/docs/dev/packages.md
 schema = 1
 name = "Hello"
-version = "0.2.0"
-description = "Writes a greeting and its settings into the library, and adds a card that shows them."
+version = "0.3.0"
+description = "Writes a greeting each sync, renders it as a document and a time series, and adds a card that lists them."
 homepage = "https://github.com/qi-imbue/datalib-hello"
 step_protocol = 1
 
 [[sources]]
 type = "hello"
-commands = { ingest = "bin/hello-ingest" }
+commands = { ingest = "bin/hello-ingest", render_markdown = "bin/hello-render", render_time_series = "bin/hello-time-series" }
 
 [sources.wizard]
 label = "Hello"
-blurb = "Writes a greeting and its settings."
+blurb = "Writes a greeting each sync: a document per greeting, and a time series of them."
 nameHint = "Hello test"
 defaultName = "hello"
 sections = [{ heading = "What to say", fields = ["greeting"] }]
 fields = [{ kind = "text", target = "greeting", label = "Greeting", required = true }]
 
-[[applets]]
-id = "hello_greetings"
+[[sources.applets]]
+id = "greetings"
 command = "bin/hello-greetings"

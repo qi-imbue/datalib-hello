@@ -1,11 +1,11 @@
-//! The Hello package's applet: a "Greetings" card listing what each Hello
-//! source in the library last wrote. The contract is datalib's
+//! The Hello package's applet: a "Greetings" card listing what one Hello
+//! source has written, newest first. Each Hello source gets its own, and
+//! its params name the source (`source`). The contract is datalib's
 //! docs/dev/applets.md: write the component, bind a port, announce it,
 //! and answer only requests that carry the gateway's secret.
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 use std::{env, fs, process, thread};
 
 use serde_json::json;
@@ -42,9 +42,14 @@ fn run() -> Result<(), String> {
     let secret =
         env::var("DATALIB_APPLET_SECRET").map_err(|_| "DATALIB_APPLET_SECRET is not set")?;
     let root = PathBuf::from(env::var("DATALIB_DAG_DATA_ROOT").unwrap_or_else(|_| ".".into()));
+    let source = datalib_sdk::step::params()?
+        .get("source")
+        .and_then(|s| s.as_str())
+        .ok_or("params.source names no source")?
+        .to_string();
     exit_with_parent();
 
-    write_frontend(&frontend_dir)?;
+    write_frontend(&frontend_dir, &source)?;
     let server = Server::http(("127.0.0.1", port)).map_err(|e| format!("bind: {e}"))?;
     let port = server
         .server_addr()
@@ -69,7 +74,7 @@ fn run() -> Result<(), String> {
         let response = if !admitted {
             Response::from_string("forbidden").with_status_code(403)
         } else if request.url().split('?').next() == Some("/greetings") {
-            Response::from_string(greetings(&root).to_string()).with_header(
+            Response::from_string(greetings(&root, &source).to_string()).with_header(
                 Header::from_bytes("Content-Type", "application/json").expect("a valid header"),
             )
         } else {
@@ -80,7 +85,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn write_frontend(dir: &Path) -> Result<(), String> {
+fn write_frontend(dir: &Path, source: &str) -> Result<(), String> {
     let namespace = dir
         .file_name()
         .and_then(|s| s.to_str())
@@ -90,8 +95,8 @@ fn write_frontend(dir: &Path) -> Result<(), String> {
     let js = dir.join(format!("{hash}.js"));
     fs::write(&js, COMPONENT_JS).map_err(|e| format!("write {}: {e}", js.display()))?;
     let meta = json!({
-        "title": "Greetings",
-        "description": "What each Hello source in this library last wrote.",
+        "title": format!("Greetings · {source}"),
+        "description": format!("What the Hello source {source} has written."),
         "component_hash": hash,
         // The namespace is the applet's id; the card calls /applet/<id>/.
         "component_args": [namespace],
@@ -101,38 +106,17 @@ fn write_frontend(dir: &Path) -> Result<(), String> {
         .map_err(|e| format!("write {}: {e}", meta_path.display()))
 }
 
-/// A Hello source's ingest writes `<root>/<source id>/ingest/hello.txt`:
-/// a first line, then the params it ran with, as JSON.
-fn greetings(root: &Path) -> serde_json::Value {
-    let mut out = Vec::new();
-    let mut sources: Vec<_> = fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
+/// What the source's ingest wrote to `<root>/<source>/ingest/greetings.jsonl`,
+/// newest first. A line that does not parse is left out.
+fn greetings(root: &Path, source: &str) -> serde_json::Value {
+    let file = root.join(source).join("ingest").join("greetings.jsonl");
+    let text = fs::read_to_string(file).unwrap_or_default();
+    let mut rows: Vec<serde_json::Value> = text
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
         .collect();
-    sources.sort();
-    for source in sources {
-        let file = source.join("ingest").join("hello.txt");
-        let Ok(text) = fs::read_to_string(&file) else {
-            continue;
-        };
-        let params: serde_json::Value = text
-            .split_once('\n')
-            .and_then(|(_, rest)| serde_json::from_str(rest).ok())
-            .unwrap_or_default();
-        let written_ms = fs::metadata(&file)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_millis() as u64);
-        out.push(json!({
-            "source": source.file_name().and_then(|s| s.to_str()).unwrap_or(""),
-            "greeting": params.get("greeting").and_then(|g| g.as_str()).unwrap_or(""),
-            "written_ms": written_ms,
-        }));
-    }
-    serde_json::Value::Array(out)
+    rows.reverse();
+    json!({ "source": source, "greetings": rows })
 }
 
 /// The gateway holds stdin open for as long as it runs; EOF means it is

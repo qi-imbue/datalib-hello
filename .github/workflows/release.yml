@@ -1,4 +1,4 @@
-# Pushing a tag v* builds both programs for every platform datalib ships
+# Pushing a tag v* builds the programs for every platform datalib ships
 # for, packs one archive per platform with tools/pack_datalib_package.py,
 # and publishes them with the manifest as that tag's GitHub release.
 name: release
@@ -29,7 +29,7 @@ jobs:
       # A tar keeps the executable bits, which upload-artifact drops.
       - run: |
           mkdir -p dist/bin
-          cp target/${{ matrix.target }}/release/hello-ingest target/${{ matrix.target }}/release/hello-greetings dist/bin/
+          for p in hello-ingest hello-render hello-time-series hello-greetings; do cp target/${{ matrix.target }}/release/$p dist/bin/; done
           tar -C dist -cf ${{ matrix.target }}.tar bin
       - uses: actions/upload-artifact@v4
         with:
