@@ -1,0 +1,16 @@
+#!/bin/sh
+# The example package's one step: writes a greeting and the params it was
+# given into the tree it owns, `$DATALIB_DAG_STEP` under the data root.
+set -eu
+mkdir -p "$DATALIB_DAG_STEP"
+params=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --params-file) params="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+{
+  echo "hello from a package"
+  if [ -n "$params" ]; then cat "$params"; fi
+} > "$DATALIB_DAG_STEP/hello.txt"
