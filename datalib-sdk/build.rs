@@ -37,7 +37,9 @@ fn main() {
         .flag_if_supported("-Wno-sign-compare")
         .flag_if_supported("-Wno-deprecated-non-prototype");
     build.compile("doltlite");
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
+    // glibc splits these out of libc; musl's libc holds them, and asking
+    // for them there links glibc's static copies instead.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu") {
         println!("cargo:rustc-link-lib=m");
         println!("cargo:rustc-link-lib=pthread");
         println!("cargo:rustc-link-lib=dl");
